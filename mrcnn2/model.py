@@ -15,6 +15,9 @@ import math
 from collections import OrderedDict
 import multiprocessing
 import numpy as np
+if not hasattr(np, "bool"):
+    np.bool = bool
+
 import tensorflow as tf
 import tensorflow.keras as keras
 import tensorflow.keras.backend as K
@@ -23,7 +26,7 @@ import tensorflow.keras.utils as KU
 #from tensorflow.python.eager import context
 import tensorflow.keras.models as KM
 
-from mrcnn import utils
+from mrcnn2 import utils
 import sys
 from mrcnn.parallel_model import ParallelModel
 

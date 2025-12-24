@@ -55,7 +55,7 @@ def display_images(images, titles=None, cols=4, cmap=None, norm=None,
                    norm=norm, interpolation=interpolation)
         i += 1
     #plt.savefig("plot.png")
-    plt.show()
+    #plt.show()
 
 
 def random_colors(N, bright=True):
@@ -110,11 +110,10 @@ def display_instances(image, boxes, masks, class_ids, class_names,
         assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
 
     # If no axis is passed, create one and automatically call show()
-    #auto_show = False
-
+    auto_show = False
     if not figAx:
         fig,ax = plt.subplots(1, figsize=figsize)
-        #auto_show = True
+        auto_show = True
     else:
         fig,ax = figAx
 
@@ -172,9 +171,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
-    # if auto_show:
-    #     plt.savefig(title+'.png')
-    #     plt.show()
+    if auto_show:
+        #plt.savefig("plot2.png")
+        plt.show()
 
 def display_differences(image,
                         gt_box, gt_class_id, gt_mask,

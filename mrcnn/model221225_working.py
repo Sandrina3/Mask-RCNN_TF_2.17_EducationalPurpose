@@ -1820,12 +1820,6 @@ class DataGenerator(KU.Sequence):
 
         inputs = [batch_images, batch_image_meta, batch_rpn_match, batch_rpn_bbox,
                   batch_gt_class_ids, batch_gt_boxes, batch_gt_masks]
-        if not self.config.USE_RPN_ROIS:
-            batch_input_rois = np.zeros((self.batch_size,
-                                         self.config.POST_NMS_ROIS_TRAINING,
-                                         4), dtype=np.float32)
-            inputs.append(batch_input_rois)
-
         outputs = []
 
         if self.random_rois:
@@ -2029,6 +2023,7 @@ class MaskRCNN(object):
             print(config.USE_RPN_ROIS)
 
             if not config.USE_RPN_ROIS:
+                print('1')
                 # Ignore predicted ROIs and use ROIs provided as an input.
                 input_rois = KL.Input(shape=[config.POST_NMS_ROIS_TRAINING, 4],
                                       name="input_roi", dtype=np.float32)#np.int32)
@@ -2081,6 +2076,7 @@ class MaskRCNN(object):
                       input_rpn_match, input_rpn_bbox, input_gt_class_ids, input_gt_boxes, input_gt_masks]
 
             if not config.USE_RPN_ROIS:
+                print('2')
                 inputs.append(input_rois)
 
             outputs = [rpn_class_logits, rpn_class, rpn_bbox,
@@ -2240,26 +2236,12 @@ class MaskRCNN(object):
         input_gt_boxes = inputs_list[5]
         input_gt_masks = inputs_list[6]
 
-        # If USE_RPN_ROIS is False, get the external ROIs from the dataset
-        if not self.config.USE_RPN_ROIS:
-            input_rois = inputs_list[7]
-
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks,
-                input_rois
-            ]
-        else:
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks
-            ]
-
         with tf.GradientTape() as tape:
             # Forward pass
-            outputs = self.keras_model(model_inputs,training=True)
+            outputs = self.keras_model([input_image, input_image_meta,
+                                        input_rpn_match, input_rpn_bbox,
+                                        input_gt_class_ids, input_gt_boxes, input_gt_masks],
+                                       training=True)
 
             # Unpack outputs
             (rpn_class_logits, rpn_class, rpn_bbox,
@@ -2307,24 +2289,10 @@ class MaskRCNN(object):
         input_gt_boxes = inputs_list[5]
         input_gt_masks = inputs_list[6]
 
-        # If USE_RPN_ROIS is False, get the external ROIs from the dataset
-        if not self.config.USE_RPN_ROIS:
-            input_rois = inputs_list[7]
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks,
-                input_rois
-            ]
-        else:
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks
-            ]
-
         # Forward pass (no gradients)
-        outputs = self.keras_model(model_inputs,
+        outputs = self.keras_model([input_image, input_image_meta,
+                                    input_rpn_match, input_rpn_bbox,
+                                    input_gt_class_ids, input_gt_boxes, input_gt_masks],
                                    training=False)
 
         # Unpack outputs

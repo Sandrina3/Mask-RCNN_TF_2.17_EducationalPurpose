@@ -740,8 +740,7 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     # Class IDs per ROI
     class_ids = tf.argmax(input=probs, axis=1, output_type=tf.int32)
     # Class probability of the top class of each ROI
-    indices = tf.stack([tf.range(tf.shape(probs)[0]), class_ids], axis=1)
-    #indices = tf.stack([tf.range(probs.shape[0]), class_ids], axis=1)
+    indices = tf.stack([tf.range(probs.shape[0]), class_ids], axis=1)
     class_scores = tf.gather_nd(probs, indices)
     # Class-specific bounding box deltas
     deltas_specific = tf.gather_nd(deltas, indices)
@@ -819,6 +818,7 @@ def refine_detections_graph(rois, probs, deltas, window, config):
     gap = config.DETECTION_MAX_INSTANCES - tf.shape(input=detections)[0]
     detections = tf.pad(tensor=detections, paddings=[(0, gap), (0, 0)], mode="CONSTANT")
     return detections
+
 
 class DetectionLayer(KL.Layer):
     """Takes classified proposal boxes and their bounding box deltas and
@@ -1295,7 +1295,7 @@ def load_image_gt(dataset, config, image_id, augmentation=None):
         assert image.shape == image_shape, "Augmentation shouldn't change image size"
         assert mask.shape == mask_shape, "Augmentation shouldn't change mask size"
         # Change mask back to bool
-        mask = mask.astype(np.bool_)
+        mask = mask.astype(np.bool)
 
     # Note that some boxes might be all zeros if the corresponding mask got cropped out.
     # and here is to filter them out
@@ -1820,12 +1820,6 @@ class DataGenerator(KU.Sequence):
 
         inputs = [batch_images, batch_image_meta, batch_rpn_match, batch_rpn_bbox,
                   batch_gt_class_ids, batch_gt_boxes, batch_gt_masks]
-        if not self.config.USE_RPN_ROIS:
-            batch_input_rois = np.zeros((self.batch_size,
-                                         self.config.POST_NMS_ROIS_TRAINING,
-                                         4), dtype=np.float32)
-            inputs.append(batch_input_rois)
-
         outputs = []
 
         if self.random_rois:
@@ -1870,13 +1864,10 @@ class MaskRCNN(object):
         # Custom metrics tracker
         self.loss_names = [
             "rpn_class_loss", "rpn_bbox_loss",
-            "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss", "loss"
+            "mrcnn_class_loss", "mrcnn_bbox_loss", "mrcnn_mask_loss"
         ]
         self.loss_tracker = {name: tf.keras.metrics.Mean(name=name) for name in self.loss_names}
         self.loss_tracker["total_loss"] = tf.keras.metrics.Mean(name="total_loss")
-        self.val_loss_tracker = {name: tf.keras.metrics.Mean(name=name) for name in self.loss_names}
-        self.val_loss_tracker["total_loss"] = tf.keras.metrics.Mean(name="total_loss")
-
         self.optimizer = None
 
 
@@ -2102,7 +2093,6 @@ class MaskRCNN(object):
             # Detections
             # output is [batch, num_detections, (y1, x1, y2, x2, class_id, score)] in
             # normalized coordinates
-            print(rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta)
             detections = DetectionLayer(config, name="mrcnn_detection")(
                 [rpn_rois, mrcnn_class, mrcnn_bbox, input_image_meta])
 
@@ -2173,7 +2163,6 @@ class MaskRCNN(object):
 
         if h5py is None:
             raise ImportError('`load_weights` requires h5py.')
-            raise ImportError('`load_weights` requires h5py.')
         with h5py.File(filepath, mode='r') as f:
             if 'layer_names' not in f.attrs and 'model_weights' in f:
                 f = f['model_weights']
@@ -2240,26 +2229,12 @@ class MaskRCNN(object):
         input_gt_boxes = inputs_list[5]
         input_gt_masks = inputs_list[6]
 
-        # If USE_RPN_ROIS is False, get the external ROIs from the dataset
-        if not self.config.USE_RPN_ROIS:
-            input_rois = inputs_list[7]
-
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks,
-                input_rois
-            ]
-        else:
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks
-            ]
-
         with tf.GradientTape() as tape:
             # Forward pass
-            outputs = self.keras_model(model_inputs,training=True)
+            outputs = self.keras_model([input_image, input_image_meta,
+                                        input_rpn_match, input_rpn_bbox,
+                                        input_gt_class_ids, input_gt_boxes, input_gt_masks],
+                                       training=True)
 
             # Unpack outputs
             (rpn_class_logits, rpn_class, rpn_bbox,
@@ -2278,7 +2253,6 @@ class MaskRCNN(object):
             losses["mrcnn_class_loss"] = class_loss
             losses["mrcnn_bbox_loss"] = bbox_loss
             losses["mrcnn_mask_loss"] = mask_loss
-            losses["loss"] = total_loss
 
             tf.print(" | ".join([f"{k}: {v}" for k, v in losses.items()]))
 
@@ -2292,64 +2266,12 @@ class MaskRCNN(object):
 
         for name in self.loss_names:
             self.loss_tracker[name].update_state(losses[name])
+        self.loss_tracker["total_loss"].update_state(total_loss)
+
+        # Optional verbose
+        #tf.print("step:", self._train_counter, "total_loss:", total_loss)
 
         return {name: self.loss_tracker[name].result() for name in self.loss_tracker}
-
-    def val_step(self, data):
-        """Compute losses for a validation batch."""
-        inputs_list, _ = data  # ignore second element
-
-        input_image = inputs_list[0]
-        input_image_meta = inputs_list[1]
-        input_rpn_match = inputs_list[2]
-        input_rpn_bbox = inputs_list[3]
-        input_gt_class_ids = inputs_list[4]
-        input_gt_boxes = inputs_list[5]
-        input_gt_masks = inputs_list[6]
-
-        # If USE_RPN_ROIS is False, get the external ROIs from the dataset
-        if not self.config.USE_RPN_ROIS:
-            input_rois = inputs_list[7]
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks,
-                input_rois
-            ]
-        else:
-            model_inputs = [
-                input_image, input_image_meta,
-                input_rpn_match, input_rpn_bbox,
-                input_gt_class_ids, input_gt_boxes, input_gt_masks
-            ]
-
-        # Forward pass (no gradients)
-        outputs = self.keras_model(model_inputs,
-                                   training=False)
-
-        # Unpack outputs
-        (rpn_class_logits, rpn_class, rpn_bbox,
-         mrcnn_class_logits, mrcnn_class, mrcnn_bbox, mrcnn_mask,
-         rpn_rois, output_rois,
-         rpn_class_loss, rpn_bbox_loss, class_loss, bbox_loss, mask_loss) = outputs
-
-        total_loss = rpn_class_loss + rpn_bbox_loss + class_loss + bbox_loss + mask_loss
-
-        # Prepare a dictionary of losses
-        val_losses = {
-            "rpn_class_loss": rpn_class_loss,
-            "rpn_bbox_loss": rpn_bbox_loss,
-            "mrcnn_class_loss": class_loss,
-            "mrcnn_bbox_loss": bbox_loss,
-            "mrcnn_mask_loss": mask_loss,
-            "loss": total_loss
-        }
-
-        for name in self.loss_names:
-            self.val_loss_tracker[name].update_state(val_losses[name])
-
-        # Return the dictionary
-        return {name: self.val_loss_tracker[name].result() for name in self.val_loss_tracker}
 
     def set_trainable(self, layer_regex, keras_model=None, indent=0, verbose=1):
         """Sets model layers as trainable if their names match
@@ -2523,7 +2445,6 @@ class MaskRCNN(object):
 
             # Callbacks: on_epoch_begin
             for cb in callbacks:
-                cb.set_model(self.keras_model)
                 if hasattr(cb, "on_epoch_begin"):
                     cb.on_epoch_begin(epoch)
 
@@ -2558,16 +2479,12 @@ class MaskRCNN(object):
                         cb.on_batch_end(step, logs=loss_dict)
 
             # Validation after each epoch
-
+            val_loss_dict = {}
             for val_batch in val_generator:
-                val_loss_dict = self.val_step(val_batch)
+                inputs_list, _ = val_batch  # ignore empty second list
 
-            # After the validation loop
-            tf.print("Validation Losses (epoch average):",
-                     " | ".join([f"{k}: {v:.4f}"
-                                 for k, v in {name: self.val_loss_tracker[name].result()
-                                              for name in self.loss_names}.items()]))
-            tf.print("Validation Total Loss:", val_loss_dict.get("loss", 0.0))
+                images = inputs_list[0]
+                outputs = self.keras_model(images, training=False)
 
             # Callbacks: on_epoch_end
             for cb in callbacks:
@@ -2692,7 +2609,8 @@ class MaskRCNN(object):
         masks: [H, W, N] instance binary masks
         """
         assert self.mode == "inference", "Create model in inference mode."
-        assert len(images) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
+        assert len(
+            images) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
 
         if verbose:
             log("Processing {} images".format(len(images)))

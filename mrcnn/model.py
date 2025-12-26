@@ -2284,9 +2284,9 @@ class MaskRCNN(object):
 
         grads = tape.gradient(total_loss, self.keras_model.trainable_variables)
 
-        # for g, v in zip(grads, self.keras_model.trainable_variables):
-        #     if g is None:
-        #         print("NO GRAD FOR:", v.name)
+        for g, v in zip(grads, self.keras_model.trainable_variables):
+			if g is None:
+				print("NO GRAD FOR:", v.name)
 
         self.optimizer.apply_gradients(zip(grads, self.keras_model.trainable_variables))
 

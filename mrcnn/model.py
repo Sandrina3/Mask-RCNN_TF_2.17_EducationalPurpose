@@ -2279,10 +2279,9 @@ class MaskRCNN(object):
             losses["loss"] = total_loss
 
             tf.print(" | ".join([f"{k}: {v}" for k, v in losses.items()]))
-
-		print("Number of trainable variables:",len(self.keras_model.trainable_variables))
-
+		
         grads = tape.gradient(total_loss, self.keras_model.trainable_variables)
+		print("Number of trainable variables:",len(self.keras_model.trainable_variables))
 
         for g, v in zip(grads, self.keras_model.trainable_variables):
 			if g is None:

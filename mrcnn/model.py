@@ -1,4 +1,3 @@
-
 """
 Mask R-CNN
 The main Mask R-CNN model implementation.
@@ -2279,13 +2278,14 @@ class MaskRCNN(object):
             losses["loss"] = total_loss
 
             tf.print(" | ".join([f"{k}: {v}" for k, v in losses.items()]))
-		
+
+        print("Number of trainable variables:", len(self.keras_model.trainable_variables))
+
         grads = tape.gradient(total_loss, self.keras_model.trainable_variables)
-		print("Number of trainable variables:",len(self.keras_model.trainable_variables))
 
         for g, v in zip(grads, self.keras_model.trainable_variables):
-			if g is None:
-				print("NO GRAD FOR:", v.name)
+            if g is None:
+                print("NO GRAD FOR:", v.name)
 
         self.optimizer.apply_gradients(zip(grads, self.keras_model.trainable_variables))
 
@@ -3080,3 +3080,4 @@ def denorm_boxes_graph(boxes, shape):
     scale = tf.concat([h, w, h, w], axis=-1) - tf.constant(1.0)
     shift = tf.constant([0., 0., 1., 1.])
     return tf.cast(tf.round(tf.multiply(boxes, scale) + shift), tf.int32)
+

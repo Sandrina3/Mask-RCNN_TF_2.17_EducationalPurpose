@@ -2033,8 +2033,7 @@ class MaskRCNN(object):
                                       name="input_roi", dtype=np.float32)#np.int32)
                 # Normalize coordinates
                 target_rois = KL.Lambda(
-                    lambda x: norm_boxes_graph(x[0], tf.shape(x[1])[1:3],output_shape=lambda input_shapes: input_shapes[0])
-                )([input_rois, input_image])
+                    lambda x: norm_boxes_graph(x[0], tf.shape(x[1])[1:3]),output_shape=lambda input_shapes: input_shapes[0])([input_rois, input_image])
 
             else:
                 target_rois = rpn_rois

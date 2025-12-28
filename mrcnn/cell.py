@@ -137,7 +137,7 @@ class CellConfig(Config):
     NAME = "cell"
 
     # Adjust depending on your GPU memory
-    IMAGES_PER_GPU = 1
+    IMAGES_PER_GPU = 8
 
     # Number of classes (including background)
 
@@ -161,8 +161,8 @@ class CellConfig(Config):
     # Input image resizing
     # Random crops of size 512x512
     IMAGE_RESIZE_MODE = "crop"
-    IMAGE_MIN_DIM = 256#256#64#128#256#512
-    IMAGE_MAX_DIM = 256#256#64#128#256#512
+    IMAGE_MIN_DIM = 512#256#64#128#256#512
+    IMAGE_MAX_DIM = 512#256#64#128#256#512
     IMAGE_MIN_SCALE = 2.0#1.0
 
     # Length of square anchor side in pixels

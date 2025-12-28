@@ -31,7 +31,7 @@ import sys
 import datetime
 import numpy as np
 #import skimage.io
-from imgaug import augmenters as iaa
+#from imgaug import augmenters as iaa
 import pandas as pd
 
 # Root directory of the project
@@ -303,18 +303,18 @@ def train(model, dataset_dir, subset):
     dataset_val.load_cell(dataset_dir, "val")
     dataset_val.prepare()
 
-    # Image augmentation
-    augmentation = iaa.SomeOf((0,2), [
-        iaa.Fliplr(0.5),
-        iaa.Flipud(0.5),
-        iaa.OneOf([
-            iaa.Affine(rotate=90),
-            iaa.Affine(rotate=180),
-            iaa.Affine(rotate=270)
-        ]),
-        iaa.Multiply((0.8, 1.5)),
-        iaa.GaussianBlur(sigma=(0.0, 5.0))
-    ])
+    # # Image augmentation
+    # augmentation = iaa.SomeOf((0,2), [
+    #     iaa.Fliplr(0.5),
+    #     iaa.Flipud(0.5),
+    #     iaa.OneOf([
+    #         iaa.Affine(rotate=90),
+    #         iaa.Affine(rotate=180),
+    #         iaa.Affine(rotate=270)
+    #     ]),
+    #     iaa.Multiply((0.8, 1.5)),
+    #     iaa.GaussianBlur(sigma=(0.0, 5.0))
+    # ])
 
     # If starting from imagenet, train heads only for a bit
     # since they have random weights
@@ -323,7 +323,7 @@ def train(model, dataset_dir, subset):
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=20,
-                augmentation=augmentation,
+                #augmentation=augmentation,
                 layers='heads'
     )
 
@@ -331,7 +331,7 @@ def train(model, dataset_dir, subset):
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=40,
-                augmentation=augmentation,
+                #augmentation=augmentation,
                 layers='all'
     )
 
@@ -523,6 +523,8 @@ if __name__ == '__main__':
     else:
         print(" '{}' is not recognized. " 
               "Use 'train' or 'detect'".format(args.command))
+
+    
 
 
     

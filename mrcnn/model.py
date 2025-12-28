@@ -2543,6 +2543,11 @@ class MaskRCNN(object):
         if layers in layer_regex.keys():
             layers = layer_regex[layers]
 
+        if hasattr(self, "set_trainable"):
+            self.set_trainable(layers)
+        self.compile(learning_rate, self.config.LEARNING_MOMENTUM)
+
+
         # Data generators
         train_generator = DataGenerator(train_dataset, self.config, shuffle=True,
                                          augmentation=augmentation)
@@ -2591,9 +2596,6 @@ class MaskRCNN(object):
         # Train
         log("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
         log("Checkpoint Path: {}".format(self.checkpoint_path))
-        if hasattr(self, "set_trainable"):
-            self.set_trainable(layers)
-        self.compile(learning_rate, self.config.LEARNING_MOMENTUM)
 
         # Work-around for Windows: Keras fails on Windows when using
         # multiprocessing workers. See discussion here:

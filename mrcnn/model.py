@@ -2069,7 +2069,7 @@ class MaskRCNN(object):
                 lambda x: parse_image_meta_graph(x)["active_class_ids"]
                 )(input_image_meta)
 
-            #print(config.USE_RPN_ROIS)
+            print(config.USE_RPN_ROIS)
 
             if not config.USE_RPN_ROIS:
                 # Ignore predicted ROIs and use ROIs provided as an input.
@@ -2262,6 +2262,9 @@ class MaskRCNN(object):
             clipnorm=self.config.GRADIENT_CLIP_NORM
         )
 
+        # 🔑 CRITICAL: attach optimizer to keras model
+        self.keras_model.optimizer = self.optimizer
+
     #@property
     def metrics(self):
         return list(self.loss_tracker.values())
@@ -2271,6 +2274,7 @@ class MaskRCNN(object):
 
         """Custom train_step for TF 2.x"""
         #summarize(data)
+        #input()
 
         inputs_list, _ = data  # ignore second element (empty list)
 
@@ -2578,6 +2582,12 @@ class MaskRCNN(object):
         if custom_callbacks:
             callbacks += custom_callbacks
 
+            # Callbacks: on_epoch_begin
+            for cb in callbacks:
+                cb.set_model(self.keras_model)
+                if hasattr(cb, "on_train_begin"):
+                    cb.on_train_begin()
+
         # Train
         log("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
         log("Checkpoint Path: {}".format(self.checkpoint_path))
@@ -2599,7 +2609,6 @@ class MaskRCNN(object):
 
             # Callbacks: on_epoch_begin
             for cb in callbacks:
-                cb.set_model(self.keras_model)
                 if hasattr(cb, "on_epoch_begin"):
                     cb.on_epoch_begin(epoch)
 
@@ -2632,10 +2641,13 @@ class MaskRCNN(object):
 
                 tf.print("Epoch:", epoch + 1, "Step:", step + 1, "Loss:", loss_dict.get("loss", 0.0))
 
+                # Convert logs to scalars
+                logs = {k: float(v) for k, v in loss_dict.items()}
+
                 # Callbacks: on_batch_end
                 for cb in callbacks:
                     if hasattr(cb, "on_batch_end"):
-                        cb.on_batch_end(step, logs=loss_dict)
+                        cb.on_batch_end(step, logs=logs)
 
             # Validation after each epoch
             val_steps_per_epoch = len(val_generator)
@@ -2654,7 +2666,11 @@ class MaskRCNN(object):
             # Callbacks: on_epoch_end
             for cb in callbacks:
                 if hasattr(cb, "on_epoch_end"):
-                    cb.on_epoch_end(epoch, logs=loss_dict)
+                    cb.on_epoch_end(epoch, logs=logs)
+
+        for cb in callbacks:
+            if hasattr(cb, "on_train_end"):
+                cb.on_train_end()
 
         self.epoch = max(self.epoch, epochs)
 

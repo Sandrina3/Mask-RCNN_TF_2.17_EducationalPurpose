@@ -25,23 +25,22 @@ if __name__ == 'main':
     # Agg backend runs without a display
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-
-import cv2
 import os
 import sys
 #import json
 import datetime
 import numpy as np
-#import skimage.ioù
-if not hasattr(np, "bool"):
-    np.bool = bool
-
+#import skimage.io
+from imgaug import augmenters as iaa
 import pandas as pd
 
-ROOT_DIR = '/workspace/data/sartorius-cell-instance-segmentation'
+# Root directory of the project
+ROOT_DIR = os.getcwd()
 
-from mrcnn import utils
+# Import Mask RCNN
+sys.path.append(ROOT_DIR) # To find local version of the library
 from mrcnn.config import Config
+from mrcnn import utils
 from mrcnn import model as modellib
 from mrcnn import visualize
 
@@ -57,7 +56,8 @@ DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 
 RESULTS_DIR = os.path.join(ROOT_DIR, "results/cells/")
 
-DATASET_DIR = os.path.join(ROOT_DIR, "cell/train.csv")
+DATASET_DIR = os.path.join(ROOT_DIR, "data/sartorius-cell-instance-segmentation/cell/train.csv")
+
 # Directory of train.csv file
 #TRAIN = os.path.join(ROOT_DIR, 'train.csv')
 #train = pd.read_csv(TRAIN)
@@ -137,7 +137,7 @@ class CellConfig(Config):
     NAME = "cell"
 
     # Adjust depending on your GPU memory
-    IMAGES_PER_GPU = 8
+    IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
 
@@ -161,23 +161,23 @@ class CellConfig(Config):
     # Input image resizing
     # Random crops of size 512x512
     IMAGE_RESIZE_MODE = "crop"
-    IMAGE_MIN_DIM = 512#256#64#128#256#512
-    IMAGE_MAX_DIM = 512#256#64#128#256#512
-    IMAGE_MIN_SCALE = 2.0#1.0
+    IMAGE_MIN_DIM = 256
+    IMAGE_MAX_DIM = 256
+    IMAGE_MIN_SCALE = 2.0
 
     # Length of square anchor side in pixels
-    RPN_ANCHOR_SCALES =  (8, 16, 32, 64, 128)#(8, 16)#, 32) #(8, 16, 32, 64, 128)
+    RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)
 
     # ROIs kept after non-maximum supression (training and inference)
-    POST_NMS_ROIS_TRAINING = 1000#256#1000
-    POST_NMS_ROIS_INFERENCE = 2000#256#500#2000
+    POST_NMS_ROIS_TRAINING = 1000
+    POST_NMS_ROIS_INFERENCE = 2000
 
     # Non-max suppression threshold to filter RPN proposals.
     # You can increase this during training to generate more propsals.
     RPN_NMS_THRESHOLD = 0.9
 
     # How many anchors per image to use for RPN training
-    RPN_TRAIN_ANCHORS_PER_IMAGE = 64#16#32#64
+    RPN_TRAIN_ANCHORS_PER_IMAGE = 64
 
     # Image mean (RGB)
     MEAN_PIXEL = np.array([43.53, 39.56, 48.22])
@@ -185,24 +185,23 @@ class CellConfig(Config):
     # If enabled, resizes instance masks to a smaller size to reduce
     # memory load. Recommended when using high-resolution images.
     USE_MINI_MASK = True
-    MINI_MASK_SHAPE =(56, 56)# (28, 28) # (56, 56)  # (height, width) of the mini-mask
+    MINI_MASK_SHAPE = (56, 56)  # (height, width) of the mini-mask
 
     # Number of ROIs per image to feed to classifier/mask heads
     # The Mask RCNN paper uses 512 but often the RPN doesn't generate
     # enough positive proposals to fill this and keep a positive:negative
     # ratio of 1:3. You can increase the number of proposals by adjusting
     # the RPN NMS threshold.
-    TRAIN_ROIS_PER_IMAGE = 128#32#64#128
+    TRAIN_ROIS_PER_IMAGE = 128
 
-    STEPS_PER_EPOCH = 200#100#200
+    STEPS_PER_EPOCH = 200
 
     # Maximum number of ground truth instances to use in one image
-    MAX_GT_INSTANCES = 200#10#50#200
+    MAX_GT_INSTANCES = 200
 
     # Max number of final detections per image
-    DETECTION_MAX_INSTANCES = 400#10#50#200#400
-    USE_RPN_ROIS = True
-
+    DETECTION_MAX_INSTANCES = 400
+    USE_RPN_ROIS=True
 
 
 class CellInferenceConfig(CellConfig):
@@ -276,7 +275,6 @@ class CellDataset(utils.Dataset):
 
         # Get masks by image_id
         masks = rle_decode(image_id, DATASET_DIR)
-        #masks = resize_mask(masks)
         masks = padding_image(masks, 0)
 
         # Get label
@@ -305,11 +303,27 @@ def train(model, dataset_dir, subset):
     dataset_val.load_cell(dataset_dir, "val")
     dataset_val.prepare()
 
+    # Image augmentation
+    augmentation = iaa.SomeOf((0,2), [
+        iaa.Fliplr(0.5),
+        iaa.Flipud(0.5),
+        iaa.OneOf([
+            iaa.Affine(rotate=90),
+            iaa.Affine(rotate=180),
+            iaa.Affine(rotate=270)
+        ]),
+        iaa.Multiply((0.8, 1.5)),
+        iaa.GaussianBlur(sigma=(0.0, 5.0))
+    ])
+
+    # If starting from imagenet, train heads only for a bit
+    # since they have random weights
+
     print("Train network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=20,
-                #augmentation=augmentation,
+                augmentation=augmentation,
                 layers='heads'
     )
 
@@ -317,7 +331,7 @@ def train(model, dataset_dir, subset):
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=40,
-                #augmentation=augmentation,
+                augmentation=augmentation,
                 layers='all'
     )
 
@@ -338,36 +352,6 @@ def padding_image(image, constant_values):
 
         else:
             return np.pad(image, ((pad_h, pad_h), (pad_w, pad_w)), constant_values=constant_values)
-
-def resize_mask(mask):
-    """
-    Resize masks to target dimensions (HEIGHT_TARGET x WIDTH_TARGET),
-    compatible with Mask R-CNN pipeline.
-
-    Args:
-        mask: np.ndarray
-            Can be 2D (H,W) or 3D (H,W,N) for multi-instance masks.
-
-    Returns:
-        np.ndarray resized to (HEIGHT_TARGET, WIDTH_TARGET) or (HEIGHT_TARGET, WIDTH_TARGET, N)
-    """
-    # Single mask 2D
-    if mask.ndim == 2:
-        mask_resized = cv2.resize(mask, (WIDTH_TARGET, HEIGHT_TARGET), interpolation=cv2.INTER_NEAREST)
-        return mask_resized
-
-    # Multi-instance masks (H,W,N)
-    elif mask.ndim == 3:
-        H, W, N = mask.shape
-        masks_resized = []
-        for i in range(N):
-            m = mask[..., i]
-            m_resized = cv2.resize(m, (WIDTH_TARGET, HEIGHT_TARGET), interpolation=cv2.INTER_NEAREST)
-            masks_resized.append(m_resized)
-        return np.stack(masks_resized, axis=-1)
-
-    else:
-        raise ValueError(f"Unsupported mask shape {mask.shape}")
 
 def rle_decode(image_id, dataset_dir):
         train = pd.read_csv(dataset_dir)
@@ -433,7 +417,7 @@ def detect(model, dataset_dir, subset):
             show_bbox=False, show_mask=False,
             title="Predictions"
         )
-        #plt.savefig("{}/{}.png".format(submit_dir, dataset.image_info['image_id']["id"]))
+        plt.savefig("{}/{}.png".format(submit_dir, dataset.image_info['image_id']["id"]))
 
     # Save to csv file
     submission = "ImageId, EncodedPixels\n" + "\n".join(submission)
@@ -540,6 +524,5 @@ if __name__ == '__main__':
         print(" '{}' is not recognized. " 
               "Use 'train' or 'detect'".format(args.command))
 
-    
 
     

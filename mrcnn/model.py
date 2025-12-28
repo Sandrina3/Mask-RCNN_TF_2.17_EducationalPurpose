@@ -1,3 +1,4 @@
+
 """
 Mask R-CNN
 The main Mask R-CNN model implementation.
@@ -11,6 +12,7 @@ import os
 import datetime
 import re
 import math
+import csv
 from collections import OrderedDict
 import multiprocessing
 import numpy as np
@@ -41,6 +43,49 @@ assert LooseVersion(tf.__version__) >= LooseVersion("2.0")
 ############################################################
 #  Utility Functions
 ############################################################
+
+class CSVLossLogger:
+    def __init__(self, log_dir):
+        os.makedirs(log_dir, exist_ok=True)
+        self.train_path = os.path.join(log_dir, "train_losses.csv")
+        self.val_path   = os.path.join(log_dir, "val_losses.csv")
+        self.train_batch_counter = 0
+        self.val_batch_counter   = 0
+
+        self._init_csv(self.train_path)
+        self._init_csv(self.val_path)
+
+    def _init_csv(self, path):
+        if not os.path.exists(path):
+            with open(path, "w", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    "step",
+                    "total_loss",
+                    "rpn_class_loss",
+                    "rpn_bbox_loss",
+                    "mrcnn_class_loss",
+                    "mrcnn_bbox_loss",
+                    "mrcnn_mask_loss",
+                ])
+
+    def log_train(self, losses):
+        self.train_batch_counter += 1
+        with open(self.train_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([self.train_batch_counter] + [float(v) for v in losses.values()])
+
+    def log_val(self, losses):
+        self.val_batch_counter += 1
+        with open(self.val_path, "a", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([self.val_batch_counter] + [float(v) for v in losses.values()])
+
+
+
+
+
+
 
 def summarize(x, prefix="data"):
     if isinstance(x, np.ndarray):
@@ -1665,6 +1710,7 @@ def generate_random_rois(image_shape, count, gt_class_ids, gt_boxes):
     return rois
 
 
+
 class DataGenerator(KU.Sequence):
     """An iterable that returns images and corresponding target class ids,
         bounding box deltas, and masks. It inherits from keras.utils.Sequence to avoid data redundancy
@@ -1878,7 +1924,6 @@ class MaskRCNN(object):
 
         self.optimizer = None
 
-
     def build(self, mode, config):
         """Build Mask R-CNN architecture.
             input_shape: The shape of the input image.
@@ -2024,7 +2069,7 @@ class MaskRCNN(object):
                 lambda x: parse_image_meta_graph(x)["active_class_ids"]
                 )(input_image_meta)
 
-            print(config.USE_RPN_ROIS)
+            #print(config.USE_RPN_ROIS)
 
             if not config.USE_RPN_ROIS:
                 # Ignore predicted ROIs and use ROIs provided as an input.
@@ -2193,6 +2238,8 @@ class MaskRCNN(object):
         # Update the log directory
         self.set_log_dir(filepath)
 
+
+
     def get_imagenet_weights(self):
         """Downloads ImageNet trained weights from Keras.
         Returns path to weights file.
@@ -2283,9 +2330,13 @@ class MaskRCNN(object):
 
         grads = tape.gradient(total_loss, self.keras_model.trainable_variables)
 
-        # for g, v in zip(grads, self.keras_model.trainable_variables):
-        #     if g is None:
-        #         print("NO GRAD FOR:", v.name)
+        # Manual print for debugging
+        for g, v in zip(grads, self.keras_model.trainable_variables):
+            if g is None:
+                print("NO GRADIENT for:", v.name)
+            # else:
+            #     print("Gradient exists for:", v.name, "shape:", g.shape)
+
         # for v in self.keras_model.trainable_variables:
         #     tf.print(v.name, "connected to loss:", tape.watched_variables())
 
@@ -2293,6 +2344,9 @@ class MaskRCNN(object):
 
         for name in self.loss_names:
             self.loss_tracker[name].update_state(losses[name])
+
+        # Log after computing losses
+        self.csv_logger.log_train(losses)
 
         return {name: self.loss_tracker[name].result() for name in self.loss_tracker}
 
@@ -2348,6 +2402,9 @@ class MaskRCNN(object):
 
         for name in self.loss_names:
             self.val_loss_tracker[name].update_state(val_losses[name])
+
+        # Log after computing val losses
+        self.csv_logger.log_val(val_losses)
 
         # Return the dictionary
         return {name: self.val_loss_tracker[name].result() for name in self.val_loss_tracker}
@@ -2427,6 +2484,10 @@ class MaskRCNN(object):
             self.config.NAME.lower()))
         self.checkpoint_path = self.checkpoint_path.replace(
             "*epoch*", "{epoch:04d}")
+
+        # --- Instantiate CSV logger here ---
+        self.csv_logger = CSVLossLogger(log_dir=self.log_dir)
+
 
     def train(self, train_dataset, val_dataset, learning_rate, epochs, layers,
               augmentation=None, custom_callbacks=None, no_augmentation_sources=None):
@@ -2542,30 +2603,34 @@ class MaskRCNN(object):
                 if hasattr(cb, "on_epoch_begin"):
                     cb.on_epoch_begin(epoch)
 
+            steps_per_epoch = len(train_generator)
+
             step = 0
-            for batch_data in train_generator:
+            for step in range(steps_per_epoch):
+            #for batch_data in train_generator:
+                batch_data = train_generator[step]
 
                 # print(type(batch_data))
-                # if isinstance(batch_data, tuple):
-                #     print("Tuple length:", len(batch_data))
-                #     for i, item in enumerate(batch_data):
-                #         print(f"Item {i} type:", type(item))
-                #         # If it’s a list/array, print its shape
-                #         if isinstance(item, (list, np.ndarray)):
-                #             if isinstance(item, list):
-                #                 print(f"  List length: {len(item)}")
-                #                 for j, subitem in enumerate(item):
-                #                     if isinstance(subitem, np.ndarray):
-                #                         print(f"    Subitem {j} shape: {subitem.shape}")
-                #             else:
-                #                 print("  Shape:", item.shape)
-                # input()
+                    # if isinstance(batch_data, tuple):
+                    #     print("Tuple length:", len(batch_data))
+                    #     for i, item in enumerate(batch_data):
+                    #         print(f"Item {i} type:", type(item))
+                    #         # If it’s a list/array, print its shape
+                    #         if isinstance(item, (list, np.ndarray)):
+                    #             if isinstance(item, list):
+                    #                 print(f"  List length: {len(item)}")
+                    #                 for j, subitem in enumerate(item):
+                    #                     if isinstance(subitem, np.ndarray):
+                    #                         print(f"    Subitem {j} shape: {subitem.shape}")
+                    #             else:
+                    #                 print("  Shape:", item.shape)
+                    # input()
 
                 loss_dict = self.train_step(batch_data)
 
                 # Print verbose info
+
                 tf.print("Epoch:", epoch + 1, "Step:", step + 1, "Loss:", loss_dict.get("loss", 0.0))
-                step += 1
 
                 # Callbacks: on_batch_end
                 for cb in callbacks:
@@ -2573,8 +2638,10 @@ class MaskRCNN(object):
                         cb.on_batch_end(step, logs=loss_dict)
 
             # Validation after each epoch
+            val_steps_per_epoch = len(val_generator)
 
-            for val_batch in val_generator:
+            for step in range(val_steps_per_epoch):
+                val_batch = val_generator[step]
                 val_loss_dict = self.val_step(val_batch)
 
             # After the validation loop
@@ -3096,4 +3163,5 @@ def denorm_boxes_graph(boxes, shape):
     scale = tf.concat([h, w, h, w], axis=-1) - tf.constant(1.0)
     shift = tf.constant([0., 0., 1., 1.])
     return tf.cast(tf.round(tf.multiply(boxes, scale) + shift), tf.int32)
+
 

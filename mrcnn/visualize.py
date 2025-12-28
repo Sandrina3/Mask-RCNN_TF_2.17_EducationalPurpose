@@ -158,8 +158,8 @@ def display_instances(image, boxes, masks, class_ids, class_names,
 
         # Mask
 
-        if masks.shape[0] != image.shape[0] or masks.shape[1] != image.shape[1]:
-            masks = utils.expand_mask(boxes, masks, image.shape)
+        #if masks.shape[0] != image.shape[0] or masks.shape[1] != image.shape[1]:
+         #   masks = utils.expand_mask(boxes, masks, image.shape)
 
         mask = masks[:, :, i]
         if show_mask:

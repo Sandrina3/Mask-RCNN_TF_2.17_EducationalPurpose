@@ -129,6 +129,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     ax.set_title(title)
     # print("image_size is {}".format(image.shape))
     masked_image = image.astype(np.uint32).copy()
+
     for i in range(N):
         color = colors[i]
 
@@ -156,6 +157,10 @@ def display_instances(image, boxes, masks, class_ids, class_names,
                     color='w', size=11, backgroundcolor="none")
 
         # Mask
+
+        if masks.shape[0] != image.shape[0] or masks.shape[1] != image.shape[1]:
+            masks = utils.expand_mask(boxes, masks, image.shape)
+
         mask = masks[:, :, i]
         if show_mask:
             masked_image = apply_mask(masked_image, mask, color)

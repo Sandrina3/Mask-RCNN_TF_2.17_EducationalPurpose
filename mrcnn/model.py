@@ -2587,11 +2587,11 @@ class MaskRCNN(object):
         if custom_callbacks:
             callbacks += custom_callbacks
 
-            # Callbacks: on_epoch_begin
-            for cb in callbacks:
-                cb.set_model(self.keras_model)
-                if hasattr(cb, "on_train_begin"):
-                    cb.on_train_begin()
+        # Callbacks: on_epoch_begin
+        for cb in callbacks:
+            cb.set_model(self.keras_model)
+            if hasattr(cb, "on_train_begin"):
+                cb.on_train_begin()
 
         # Train
         log("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
@@ -3181,5 +3181,4 @@ def denorm_boxes_graph(boxes, shape):
     scale = tf.concat([h, w, h, w], axis=-1) - tf.constant(1.0)
     shift = tf.constant([0., 0., 1., 1.])
     return tf.cast(tf.round(tf.multiply(boxes, scale) + shift), tf.int32)
-
 

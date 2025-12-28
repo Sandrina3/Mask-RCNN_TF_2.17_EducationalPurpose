@@ -36,7 +36,6 @@ import numpy as np
 if not hasattr(np, "bool"):
     np.bool = bool
 
-from imgaug import augmenters as iaa
 import pandas as pd
 
 ROOT_DIR = '/workspace/data/sartorius-cell-instance-segmentation'
@@ -138,7 +137,7 @@ class CellConfig(Config):
     NAME = "cell"
 
     # Adjust depending on your GPU memory
-    IMAGES_PER_GPU = 8
+    IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
 
@@ -162,8 +161,8 @@ class CellConfig(Config):
     # Input image resizing
     # Random crops of size 512x512
     IMAGE_RESIZE_MODE = "crop"
-    IMAGE_MIN_DIM = 128#256#64#128#256#512
-    IMAGE_MAX_DIM = 128#256#64#128#256#512
+    IMAGE_MIN_DIM = 256#256#64#128#256#512
+    IMAGE_MAX_DIM = 256#256#64#128#256#512
     IMAGE_MIN_SCALE = 2.0#1.0
 
     # Length of square anchor side in pixels
@@ -306,27 +305,11 @@ def train(model, dataset_dir, subset):
     dataset_val.load_cell(dataset_dir, "val")
     dataset_val.prepare()
 
-    # Image augmentation
-    augmentation = iaa.SomeOf((0,2), [
-        iaa.Fliplr(0.5),
-        iaa.Flipud(0.5),
-        iaa.OneOf([
-            iaa.Affine(rotate=90),
-            iaa.Affine(rotate=180),
-            iaa.Affine(rotate=270)
-        ]),
-        iaa.Multiply((0.8, 1.5)),
-        iaa.GaussianBlur(sigma=(0.0, 5.0))
-    ])
-
-    # If starting from imagenet, train heads only for a bit
-    # since they have random weights
-
     print("Train network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=20,
-                augmentation=augmentation,
+                #augmentation=augmentation,
                 layers='heads'
     )
 
@@ -334,7 +317,7 @@ def train(model, dataset_dir, subset):
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=40,
-                augmentation=augmentation,
+                #augmentation=augmentation,
                 layers='all'
     )
 
@@ -556,5 +539,7 @@ if __name__ == '__main__':
     else:
         print(" '{}' is not recognized. " 
               "Use 'train' or 'detect'".format(args.command))
+
+    
 
     

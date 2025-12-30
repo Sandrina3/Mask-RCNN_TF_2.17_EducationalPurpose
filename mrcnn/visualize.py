@@ -130,6 +130,11 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     # print("image_size is {}".format(image.shape))
     masked_image = image.astype(np.uint32).copy()
 
+    # Mask
+
+    if masks.shape[0] != image.shape[0] or masks.shape[1] != image.shape[1]:
+        masks = utils.expand_mask(boxes, masks, image.shape)
+
     for i in range(N):
         color = colors[i]
 
@@ -138,6 +143,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             # Skip this instance. Has no bbox. Likely lost in image cropping.
             continue
         y1, x1, y2, x2 = boxes[i]
+
         if show_bbox:
             p = patches.Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=2,
                                    alpha=0.7, linestyle="dashed",
@@ -156,12 +162,14 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             ax.text(x1, y1 + 8, caption,
                     color='w', size=11, backgroundcolor="none")
 
-        # Mask
+        # Debug print to check alignment
+        print("Image shape:", image.shape)
+        print("Mask shape:", masks.shape)
+        print("BBox shape:", boxes.shape)
 
-        #if masks.shape[0] != image.shape[0] or masks.shape[1] != image.shape[1]:
-         #   masks = utils.expand_mask(boxes, masks, image.shape)
 
         mask = masks[:, :, i]
+
         if show_mask:
             masked_image = apply_mask(masked_image, mask, color)
 
@@ -512,3 +520,4 @@ def display_weight_stats(model):
                 "{:+9.4f}".format(w.std()),
             ])
     display_table(table)
+

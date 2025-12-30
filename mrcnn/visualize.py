@@ -161,13 +161,7 @@ def display_instances(image, boxes, masks, class_ids, class_names,
                 caption = captions[i]
             ax.text(x1, y1 + 8, caption,
                     color='w', size=11, backgroundcolor="none")
-
-        # Debug print to check alignment
-        print("Image shape:", image.shape)
-        print("Mask shape:", masks.shape)
-        print("BBox shape:", boxes.shape)
-
-
+          
         mask = masks[:, :, i]
 
         if show_mask:

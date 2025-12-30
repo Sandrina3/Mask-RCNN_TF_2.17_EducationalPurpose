@@ -137,7 +137,7 @@ class CellConfig(Config):
     NAME = "cell"
 
     # Adjust depending on your GPU memory
-    IMAGES_PER_GPU = 6
+    IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
 
@@ -159,11 +159,11 @@ class CellConfig(Config):
     BACKBONE = "resnet50"
 
     # Input image resizing
-    # Random crops of size 512x512
+    # Random crops of size 256x256
     IMAGE_RESIZE_MODE = "crop"
-    IMAGE_MIN_DIM = 512#256
-    IMAGE_MAX_DIM = 512#256
-    IMAGE_MIN_SCALE = 2.0
+    IMAGE_MIN_DIM = 256
+    IMAGE_MAX_DIM = 256
+    IMAGE_MIN_SCALE = 1.0
 
     # Length of square anchor side in pixels
     RPN_ANCHOR_SCALES = (8, 16, 32, 64, 128)
@@ -185,7 +185,7 @@ class CellConfig(Config):
     # If enabled, resizes instance masks to a smaller size to reduce
     # memory load. Recommended when using high-resolution images.
     USE_MINI_MASK = True
-    MINI_MASK_SHAPE = (28,28)#(56, 56)  # (height, width) of the mini-mask
+    MINI_MASK_SHAPE = (28, 28)  # (height, width) of the mini-mask
 
     # Number of ROIs per image to feed to classifier/mask heads
     # The Mask RCNN paper uses 512 but often the RPN doesn't generate
@@ -524,6 +524,7 @@ if __name__ == '__main__':
         print(" '{}' is not recognized. " 
               "Use 'train' or 'detect'".format(args.command))
 
+    
     
 
 

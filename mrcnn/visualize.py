@@ -26,7 +26,7 @@ ROOT_DIR = os.path.abspath("../")
 
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
-from mrcnn import utils
+from mrcnn2 import utils
 
 
 ############################################################
@@ -55,7 +55,7 @@ def display_images(images, titles=None, cols=4, cmap=None, norm=None,
                    norm=norm, interpolation=interpolation)
         i += 1
     #plt.savefig("plot.png")
-    plt.show()
+    #plt.show()
 
 
 def random_colors(N, bright=True):
@@ -110,11 +110,10 @@ def display_instances(image, boxes, masks, class_ids, class_names,
         assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
 
     # If no axis is passed, create one and automatically call show()
-    #auto_show = False
-
+    auto_show = False
     if not figAx:
         fig,ax = plt.subplots(1, figsize=figsize)
-        #auto_show = True
+        auto_show = True
     else:
         fig,ax = figAx
 
@@ -129,12 +128,6 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     ax.set_title(title)
     # print("image_size is {}".format(image.shape))
     masked_image = image.astype(np.uint32).copy()
-
-    # Mask
-
-    if masks.shape[0] != image.shape[0] or masks.shape[1] != image.shape[1]:
-        masks = utils.expand_mask(boxes, masks, image.shape)
-
     for i in range(N):
         color = colors[i]
 
@@ -143,7 +136,6 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             # Skip this instance. Has no bbox. Likely lost in image cropping.
             continue
         y1, x1, y2, x2 = boxes[i]
-
         if show_bbox:
             p = patches.Rectangle((x1, y1), x2 - x1, y2 - y1, linewidth=2,
                                    alpha=0.7, linestyle="dashed",
@@ -161,9 +153,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,
                 caption = captions[i]
             ax.text(x1, y1 + 8, caption,
                     color='w', size=11, backgroundcolor="none")
-          
-        mask = masks[:, :, i]
 
+        # Mask
+        mask = masks[:, :, i]
         if show_mask:
             masked_image = apply_mask(masked_image, mask, color)
 
@@ -179,9 +171,9 @@ def display_instances(image, boxes, masks, class_ids, class_names,
             p = Polygon(verts, facecolor="none", edgecolor=color)
             ax.add_patch(p)
     ax.imshow(masked_image.astype(np.uint8))
-    # if auto_show:
-    #     plt.savefig(title+'.png')
-    #     plt.show()
+    if auto_show:
+        #plt.savefig("plot2.png")
+        plt.show()
 
 def display_differences(image,
                         gt_box, gt_class_id, gt_mask,

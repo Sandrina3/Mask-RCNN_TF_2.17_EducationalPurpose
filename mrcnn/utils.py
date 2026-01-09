@@ -569,7 +569,9 @@ def unmold_mask(mask, bbox, image_shape):
     """
     threshold = 0.5
     y1, x1, y2, x2 = bbox
-    mask = resize(mask, (y2 - y1, x2 - x1))
+    #mask = resize(mask, (y2 - y1, x2 - x1))
+    mask = resize(mask, (y2 - y1, x2 - x1), order=0, mode='constant', preserve_range=True)  # CAMBIARE QUI
+
     mask = np.where(mask >= threshold, 1, 0).astype(bool)
 
     # Put the mask in the right location.
@@ -908,3 +910,4 @@ def resize(image, output_shape, order=1, mode='constant', cval=0, clip=True,
             image, output_shape,
             order=order, mode=mode, cval=cval, clip=clip,
             preserve_range=preserve_range)
+

@@ -24,9 +24,9 @@ import tensorflow.keras.utils as KU
 #from tensorflow.python.eager import context
 import tensorflow.keras.models as KM
 
-from mrcnn2 import utils
+from mrcnn import utils
 import sys
-from mrcnn2.parallel_model import ParallelModel
+from mrcnn.parallel_model import ParallelModel
 
 from tensorflow.compat.v1 import ConfigProto
 from tensorflow.compat.v1 import InteractiveSession
